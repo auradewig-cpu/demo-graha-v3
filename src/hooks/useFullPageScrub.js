@@ -2,22 +2,23 @@ import { useRef, useEffect, useCallback, useState } from "react";
 
 const TOTAL = 220;
 const SRC = (i) => `/frames/hero-sequence-${String(i+1).padStart(4,"0")}.webp`;
-const MAX_CONCURRENT = 4;
+const MAX_CONCURRENT = 6; // Fix 5: naik dari 4 ke 6, Image() lebih stabil dari fetch
 
 export function useFullPageScrub() {
-  const canvasRef   = useRef(null);
-  const bitmaps     = useRef(new Array(TOTAL).fill(null));
-  const loaded      = useRef(new Array(TOTAL).fill(false));
-  const inFlight    = useRef(new Set());
-  const queue       = useRef([]);
-  const rafId       = useRef(null);
-  const lastIdx     = useRef(-1);
-  const doneCount   = useRef(0);
+  const canvasRef       = useRef(null);
+  const bitmaps         = useRef(new Array(TOTAL).fill(null));
+  const loaded          = useRef(new Array(TOTAL).fill(false));
+  const inFlight        = useRef(new Set());
+  const queue           = useRef([]);
+  const rafId           = useRef(null);
+  const lastIdx         = useRef(-1);
+  const doneCount       = useRef(0);
+  const currentProgress = useRef(0); // Fix 2: lerp state
 
   const [loadPct, setLoadPct] = useState(0);
   const [ready,   setReady]   = useState(false);
 
-  // ── Queue processor — max MAX_CONCURRENT at a time ──
+  // ── Queue processor — Fix 4: Image() langsung, hapus createImageBitmap ──
   const processQueue = useCallback(() => {
     while (
       inFlight.current.size < MAX_CONCURRENT &&
@@ -29,49 +30,26 @@ export function useFullPageScrub() {
 
       inFlight.current.add(index);
 
-      const doLoad = () => {
-        const img = new Image();
-        img.onload = () => {
-          if (typeof createImageBitmap !== "undefined") {
-            createImageBitmap(img)
-              .then(bm => {
-                bitmaps.current[index] = bm;
-                loaded.current[index]  = true;
-                inFlight.current.delete(index);
-                doneCount.current++;
-                onDone?.();
-                processQueue();
-              })
-              .catch(() => {
-                bitmaps.current[index] = img;
-                loaded.current[index]  = true;
-                inFlight.current.delete(index);
-                doneCount.current++;
-                onDone?.();
-                processQueue();
-              });
-          } else {
-            bitmaps.current[index] = img;
-            loaded.current[index]  = true;
-            inFlight.current.delete(index);
-            doneCount.current++;
-            onDone?.();
-            processQueue();
-          }
-        };
-        img.onerror = () => {
-          loaded.current[index] = true;
-          inFlight.current.delete(index);
-          processQueue();
-        };
-        img.src = SRC(index);
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        bitmaps.current[index] = img;
+        loaded.current[index]  = true;
+        inFlight.current.delete(index);
+        doneCount.current++;
+        onDone?.();
+        processQueue();
       };
-
-      doLoad();
+      img.onerror = () => {
+        loaded.current[index] = true;
+        inFlight.current.delete(index);
+        processQueue();
+      };
+      img.src = SRC(index);
     }
   }, []);
 
-  // ── Enqueue helper — skip if already loaded/in-flight ──
+  // ── Enqueue helper ──
   const enqueue = useCallback((index, onDone, priority = false) => {
     if (loaded.current[index] || inFlight.current.has(index)) {
       onDone?.();
@@ -88,6 +66,18 @@ export function useFullPageScrub() {
     }
     processQueue();
   }, [processQueue]);
+
+  // ── Fix 1: Nearest frame fallback — tidak blank saat frame belum loaded ──
+  const findNearestLoaded = useCallback((target) => {
+    if (loaded.current[target]) return target;
+    for (let offset = 1; offset < 10; offset++) {
+      const right = target + offset;
+      const left  = target - offset;
+      if (right < TOTAL && loaded.current[right]) return right;
+      if (left  >= 0    && loaded.current[left])  return left;
+    }
+    return lastIdx.current >= 0 ? lastIdx.current : 0;
+  }, []);
 
   // ── Draw frame to canvas ──
   const drawFrame = useCallback((idx) => {
@@ -122,7 +112,7 @@ export function useFullPageScrub() {
     }
   }, [drawFrame]);
 
-  // ── RAF loop — map global scroll to frame ──
+  // ── RAF loop — Fix 2 (lerp) + Fix 3 (dir-aware queue) + Fix 1 (nearest) ──
   useEffect(() => {
     let running = true;
     function tick() {
@@ -133,16 +123,25 @@ export function useFullPageScrub() {
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
       if (maxScroll <= 0) return;
 
-      const progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+      // Fix 2: lerp progress untuk smooth easing
+      const rawProgress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+      currentProgress.current += (rawProgress - currentProgress.current) * 0.12;
+      const progress = currentProgress.current;
       const target   = Math.min(TOTAL - 1, Math.floor(progress * (TOTAL - 1)));
 
-      for (let i = Math.max(0, target - 1); i <= Math.min(TOTAL - 1, target + 8); i++) {
+      // Fix 3: arah scroll menentukan berapa frame ahead vs behind
+      const scrollDir = rawProgress > currentProgress.current ? 1 : -1;
+      const ahead  = scrollDir > 0 ? 8 : 3;
+      const behind = scrollDir > 0 ? 2 : 6;
+      for (let i = Math.max(0, target - behind); i <= Math.min(TOTAL - 1, target + ahead); i++) {
         enqueue(i, undefined, true);
       }
 
-      if (target !== lastIdx.current && loaded.current[target]) {
-        lastIdx.current = target;
-        drawFrame(target);
+      // Fix 1: tampilkan nearest loaded frame, tidak blank
+      const frameToShow = findNearestLoaded(target);
+      if (frameToShow !== lastIdx.current) {
+        lastIdx.current = frameToShow;
+        drawFrame(frameToShow);
       }
 
       window.dispatchEvent(
@@ -151,7 +150,7 @@ export function useFullPageScrub() {
     }
     rafId.current = requestAnimationFrame(tick);
     return () => { running = false; cancelAnimationFrame(rafId.current); };
-  }, [ready, enqueue, drawFrame]);
+  }, [ready, enqueue, drawFrame, findNearestLoaded]);
 
   // ── Initial load strategy ──
   useEffect(() => {
