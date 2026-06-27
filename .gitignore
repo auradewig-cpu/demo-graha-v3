@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.claude/
+.claude-flow/
+*.log
+.DS_Store
+Thumbs.db
+# Source frames — already copied to public/frames/
+asset/
