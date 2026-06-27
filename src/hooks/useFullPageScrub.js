@@ -1,65 +1,120 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 
 const TOTAL = 220;
-const SRC = (i) => `/frames/hero-sequence-${String(i + 1).padStart(4, "0")}.webp`;
+const SRC = (i) => `/frames/hero-sequence-${String(i+1).padStart(4,"0")}.webp`;
+const MAX_CONCURRENT = 4;
 
 export function useFullPageScrub() {
-  const canvasRef = useRef(null);
-  const bitmaps = useRef(new Array(TOTAL).fill(null));
-  const loaded = useRef(new Array(TOTAL).fill(false));
-  const rafId = useRef(null);
-  const lastIdx = useRef(-1);
-  const [loadPct, setLoadPct] = useState(0);
-  const [ready, setReady] = useState(false);
-  const loadedCount = useRef(0);
+  const canvasRef   = useRef(null);
+  const bitmaps     = useRef(new Array(TOTAL).fill(null));
+  const loaded      = useRef(new Array(TOTAL).fill(false));
+  const inFlight    = useRef(new Set());
+  const queue       = useRef([]);
+  const rafId       = useRef(null);
+  const lastIdx     = useRef(-1);
+  const doneCount   = useRef(0);
 
-  const loadFrame = useCallback((i, onDone) => {
-    if (loaded.current[i]) { onDone?.(); return; }
-    fetch(SRC(i))
-      .then(r => r.blob())
-      .then(b => {
-        if (typeof createImageBitmap !== "undefined") {
-          return createImageBitmap(b);
-        }
-        return new Promise((res) => {
-          const img = new Image();
-          img.onload = () => res(img);
-          img.src = URL.createObjectURL(b);
-        });
-      })
-      .then(bitmap => {
-        bitmaps.current[i] = bitmap;
-        loaded.current[i] = true;
-        loadedCount.current++;
-        onDone?.();
-      })
-      .catch(() => { loaded.current[i] = true; onDone?.(); });
+  const [loadPct, setLoadPct] = useState(0);
+  const [ready,   setReady]   = useState(false);
+
+  // ── Queue processor — max MAX_CONCURRENT at a time ──
+  const processQueue = useCallback(() => {
+    while (
+      inFlight.current.size < MAX_CONCURRENT &&
+      queue.current.length > 0
+    ) {
+      const { index, onDone } = queue.current.shift();
+      if (loaded.current[index]) { onDone?.(); continue; }
+      if (inFlight.current.has(index)) continue;
+
+      inFlight.current.add(index);
+
+      const doLoad = () => {
+        const img = new Image();
+        img.onload = () => {
+          if (typeof createImageBitmap !== "undefined") {
+            createImageBitmap(img)
+              .then(bm => {
+                bitmaps.current[index] = bm;
+                loaded.current[index]  = true;
+                inFlight.current.delete(index);
+                doneCount.current++;
+                onDone?.();
+                processQueue();
+              })
+              .catch(() => {
+                bitmaps.current[index] = img;
+                loaded.current[index]  = true;
+                inFlight.current.delete(index);
+                doneCount.current++;
+                onDone?.();
+                processQueue();
+              });
+          } else {
+            bitmaps.current[index] = img;
+            loaded.current[index]  = true;
+            inFlight.current.delete(index);
+            doneCount.current++;
+            onDone?.();
+            processQueue();
+          }
+        };
+        img.onerror = () => {
+          loaded.current[index] = true;
+          inFlight.current.delete(index);
+          processQueue();
+        };
+        img.src = SRC(index);
+      };
+
+      doLoad();
+    }
   }, []);
 
+  // ── Enqueue helper — skip if already loaded/in-flight ──
+  const enqueue = useCallback((index, onDone, priority = false) => {
+    if (loaded.current[index] || inFlight.current.has(index)) {
+      onDone?.();
+      return;
+    }
+    const alreadyQueued = queue.current.some(q => q.index === index);
+    if (alreadyQueued) return;
+
+    const item = { index, onDone };
+    if (priority) {
+      queue.current.unshift(item);
+    } else {
+      queue.current.push(item);
+    }
+    processQueue();
+  }, [processQueue]);
+
+  // ── Draw frame to canvas ──
   const drawFrame = useCallback((idx) => {
     const canvas = canvasRef.current;
     const bm = bitmaps.current[idx];
     if (!canvas || !bm) return;
     const ctx = canvas.getContext("2d", { alpha: false });
-    const { width: cw, height: ch } = canvas;
-    const bw = bm.width || bm.naturalWidth;
+    const cw = canvas.width, ch = canvas.height;
+    const bw = bm.width  || bm.naturalWidth;
     const bh = bm.height || bm.naturalHeight;
     const ratio = bw / bh;
-    const cr = cw / ch;
-    let sx = 0, sy = 0, sw = bw, sh = bh;
+    const cr    = cw / ch;
+    let sx=0, sy=0, sw=bw, sh=bh;
     if (ratio > cr) { sw = bh * cr; sx = (bw - sw) / 2; }
-    else { sh = bw / cr; sy = (bh - sh) / 2; }
+    else            { sh = bw / cr; sy = (bh - sh) / 2; }
     ctx.drawImage(bm, sx, sy, sw, sh, 0, 0, cw, ch);
   }, []);
 
+  // ── Resize canvas ──
   const resizeCanvas = useCallback(() => {
     const c = canvasRef.current;
     if (!c) return;
     const mobile = window.innerWidth < 768;
     const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1 : 1.5);
-    c.width = Math.round(window.innerWidth * dpr);
+    c.width  = Math.round(window.innerWidth  * dpr);
     c.height = Math.round(window.innerHeight * dpr);
-    c.style.width = window.innerWidth + "px";
+    c.style.width  = window.innerWidth  + "px";
     c.style.height = window.innerHeight + "px";
     c.getContext("2d", { alpha: false }).scale(dpr, dpr);
     if (lastIdx.current >= 0 && bitmaps.current[lastIdx.current]) {
@@ -67,55 +122,67 @@ export function useFullPageScrub() {
     }
   }, [drawFrame]);
 
-  // RAF loop — map global scroll ke frame index
+  // ── RAF loop — map global scroll to frame ──
   useEffect(() => {
     let running = true;
     function tick() {
       if (!running) return;
       rafId.current = requestAnimationFrame(tick);
       if (!ready) return;
+
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
       if (maxScroll <= 0) return;
+
       const progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
-      const target = Math.min(TOTAL - 1, Math.floor(progress * (TOTAL - 1)));
-      const ahead = 25;
-      for (let i = Math.max(0, target - 3); i <= Math.min(TOTAL - 1, target + ahead); i++) {
-        if (!loaded.current[i]) loadFrame(i);
+      const target   = Math.min(TOTAL - 1, Math.floor(progress * (TOTAL - 1)));
+
+      for (let i = Math.max(0, target - 1); i <= Math.min(TOTAL - 1, target + 8); i++) {
+        enqueue(i, undefined, true);
       }
+
       if (target !== lastIdx.current && loaded.current[target]) {
         lastIdx.current = target;
         drawFrame(target);
       }
+
+      window.dispatchEvent(
+        new CustomEvent("scrub-progress", { detail: progress })
+      );
     }
     rafId.current = requestAnimationFrame(tick);
     return () => { running = false; cancelAnimationFrame(rafId.current); };
-  }, [ready, loadFrame, drawFrame]);
+  }, [ready, enqueue, drawFrame]);
 
-  // Preload strategy: prioritas frame 0-39, lalu batch bertahap
+  // ── Initial load strategy ──
   useEffect(() => {
-    let firstBatch = 0;
-    const PRIORITY = 40;
+    resizeCanvas();
 
-    const checkReady = () => {
-      firstBatch++;
-      const pct = Math.round((firstBatch / PRIORITY) * 100);
-      setLoadPct(pct);
-      if (firstBatch === 1) { resizeCanvas(); drawFrame(0); }
-      if (firstBatch >= PRIORITY) { setReady(true); }
+    const PRIORITY_FRAMES = 30;
+    let priorityDone = 0;
+
+    const onPriorityDone = () => {
+      priorityDone++;
+      setLoadPct(Math.round((priorityDone / PRIORITY_FRAMES) * 100));
+
+      if (priorityDone === 1) {
+        resizeCanvas();
+        drawFrame(0);
+      }
+      if (priorityDone >= PRIORITY_FRAMES) {
+        setReady(true);
+        for (let i = PRIORITY_FRAMES; i < TOTAL; i++) {
+          enqueue(i);
+        }
+      }
     };
 
-    for (let i = 0; i < PRIORITY; i++) loadFrame(i, checkReady);
-
-    const b1 = setTimeout(() => { for (let i = 40; i < 100; i++) loadFrame(i); }, 600);
-    const b2 = setTimeout(() => { for (let i = 100; i < 160; i++) loadFrame(i); }, 1400);
-    const b3 = setTimeout(() => { for (let i = 160; i < 220; i++) loadFrame(i); }, 2200);
+    for (let i = 0; i < PRIORITY_FRAMES; i++) {
+      enqueue(i, onPriorityDone, true);
+    }
 
     window.addEventListener("resize", resizeCanvas, { passive: true });
-    return () => {
-      clearTimeout(b1); clearTimeout(b2); clearTimeout(b3);
-      window.removeEventListener("resize", resizeCanvas);
-    };
-  }, [loadFrame, drawFrame, resizeCanvas]);
+    return () => window.removeEventListener("resize", resizeCanvas);
+  }, [enqueue, drawFrame, resizeCanvas]);
 
   return { canvasRef, loadPct, ready };
 }
