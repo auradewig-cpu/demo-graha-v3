@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://graha-v3.vercel.app/sitemap.xml

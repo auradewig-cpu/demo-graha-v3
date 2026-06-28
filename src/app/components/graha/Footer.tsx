@@ -164,7 +164,7 @@ export function Footer() {
             fontFamily: "'Inter', sans-serif",
             fontSize: "11px",
             letterSpacing: "0.1em",
-            color: "rgba(153,143,129,0.5)",
+            color: "rgba(153,143,129,0.9)",
           }}
         >
           ARCHITECTURAL NOIR EST. INDONESIA

@@ -144,6 +144,8 @@ export function Navbar({ activeSection }: NavbarProps) {
         <button
           className="lg:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? "Tutup menu navigasi" : "Buka menu navigasi"}
+          aria-expanded={mobileOpen}
           style={{
             background: "none",
             border: "none",
@@ -152,7 +154,7 @@ export function Navbar({ activeSection }: NavbarProps) {
             padding: "4px",
           }}
         >
-          {mobileOpen ? <X size={28} /> : <Menu size={28} />}
+          {mobileOpen ? <X size={28} aria-hidden="true" /> : <Menu size={28} aria-hidden="true" />}
         </button>
       </nav>
 

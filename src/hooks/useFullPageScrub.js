@@ -3,6 +3,8 @@ import { useRef, useEffect, useCallback, useState } from "react";
 const TOTAL = 220;
 const SRC = (i) => `/frames/hero-sequence-${String(i+1).padStart(4,"0")}.webp`;
 const MAX_CONCURRENT = 6; // Fix 5: naik dari 4 ke 6, Image() lebih stabil dari fetch
+const IS_MOBILE = typeof window !== "undefined" && window.innerWidth < 768;
+const FRAME_INTERVAL = IS_MOBILE ? 1000 / 30 : 0; // 30fps cap on mobile
 
 export function useFullPageScrub() {
   const canvasRef       = useRef(null);
@@ -121,16 +123,21 @@ export function useFullPageScrub() {
   // ── RAF loop — Fix 2 (lerp) + Fix 3 (dir-aware queue) + Fix 1 (nearest) ──
   useEffect(() => {
     let running = true;
+    let lastRafTime = 0;
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     function getScrollY() {
       return isIOS
         ? (window.pageYOffset || document.documentElement.scrollTop || 0)
         : window.scrollY;
     }
-    function tick() {
+    function tick(timestamp) {
       if (!running) return;
       rafId.current = requestAnimationFrame(tick);
       if (!ready) return;
+
+      // Throttle to 30fps on mobile to save CPU
+      if (FRAME_INTERVAL > 0 && timestamp - lastRafTime < FRAME_INTERVAL) return;
+      lastRafTime = timestamp;
 
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
       if (maxScroll <= 0) return;
@@ -161,7 +168,22 @@ export function useFullPageScrub() {
       );
     }
     rafId.current = requestAnimationFrame(tick);
-    return () => { running = false; cancelAnimationFrame(rafId.current); };
+
+    // Pause RAF when tab is not visible
+    const handleVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId.current);
+      } else {
+        rafId.current = requestAnimationFrame(tick);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(rafId.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [ready, enqueue, drawFrame, findNearestLoaded]);
 
   // ── Initial load strategy ──
