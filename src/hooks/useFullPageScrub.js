@@ -100,13 +100,19 @@ export function useFullPageScrub() {
   const resizeCanvas = useCallback(() => {
     const c = canvasRef.current;
     if (!c) return;
-    const mobile = window.innerWidth < 768;
-    const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1 : 1.5);
+
+    const isMobile = window.innerWidth < 768;
+    const isTablet = window.innerWidth < 1024;
+    const dpr = isMobile ? 1 : isTablet ? 1.25 : Math.min(window.devicePixelRatio || 1, 1.5);
+
     c.width  = Math.round(window.innerWidth  * dpr);
     c.height = Math.round(window.innerHeight * dpr);
     c.style.width  = window.innerWidth  + "px";
     c.style.height = window.innerHeight + "px";
-    c.getContext("2d", { alpha: false }).scale(dpr, dpr);
+
+    const ctx = c.getContext("2d", { alpha: false });
+    ctx.scale(dpr, dpr);
+
     if (lastIdx.current >= 0 && bitmaps.current[lastIdx.current]) {
       drawFrame(lastIdx.current);
     }
@@ -115,6 +121,12 @@ export function useFullPageScrub() {
   // ── RAF loop — Fix 2 (lerp) + Fix 3 (dir-aware queue) + Fix 1 (nearest) ──
   useEffect(() => {
     let running = true;
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    function getScrollY() {
+      return isIOS
+        ? (window.pageYOffset || document.documentElement.scrollTop || 0)
+        : window.scrollY;
+    }
     function tick() {
       if (!running) return;
       rafId.current = requestAnimationFrame(tick);
@@ -124,7 +136,7 @@ export function useFullPageScrub() {
       if (maxScroll <= 0) return;
 
       // Fix 2: lerp progress untuk smooth easing
-      const rawProgress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+      const rawProgress = Math.max(0, Math.min(1, getScrollY() / maxScroll));
       currentProgress.current += (rawProgress - currentProgress.current) * 0.12;
       const progress = currentProgress.current;
       const target   = Math.min(TOTAL - 1, Math.floor(progress * (TOTAL - 1)));

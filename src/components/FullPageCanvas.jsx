@@ -22,6 +22,7 @@ export function FullPageCanvas({ onReady }) {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 9999,
+            padding: "0 24px",
           }}
         >
           <p
@@ -32,13 +33,14 @@ export function FullPageCanvas({ onReady }) {
               marginBottom: 24,
               fontFamily: "sans-serif",
               textTransform: "uppercase",
+              textAlign: "center",
             }}
           >
             GRAHA STUDIO
           </p>
           <div
             style={{
-              width: 180,
+              width: "min(180px, 60vw)",
               height: 1,
               background: "rgba(200,169,110,0.2)",
             }}
@@ -77,6 +79,10 @@ export function FullPageCanvas({ onReady }) {
           height: "100vh",
           zIndex: 0,
           willChange: "contents",
+          transform: "translateZ(0)",
+          WebkitTransform: "translateZ(0)",
+          backfaceVisibility: "hidden",
+          WebkitBackfaceVisibility: "hidden",
           pointerEvents: "none",
           display: ready ? "block" : "none",
         }}

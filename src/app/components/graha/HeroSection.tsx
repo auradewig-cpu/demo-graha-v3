@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Play } from "lucide-react";
 
 interface HeroSectionProps {
@@ -5,6 +6,15 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ onCta }: HeroSectionProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check, { passive: true });
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   return (
     <section
       id="hero"
@@ -12,11 +22,10 @@ export function HeroSection({ onCta }: HeroSectionProps) {
       style={{
         minHeight: "100vh",
         display: "flex",
-        alignItems: "center",
-        paddingTop: "128px",
-        paddingBottom: "80px",
-        paddingLeft: "clamp(24px, 6vw, 80px)",
-        paddingRight: "clamp(24px, 6vw, 80px)",
+        alignItems: isMobile ? "flex-end" : "center",
+        padding: isMobile
+          ? "80px 5vw 40px"
+          : "128px clamp(24px, 6vw, 80px) 80px",
         maxWidth: "1440px",
         margin: "0 auto",
         background: "transparent",
@@ -25,29 +34,33 @@ export function HeroSection({ onCta }: HeroSectionProps) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(12, 1fr)",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(12, 1fr)",
           gap: "32px",
           width: "100%",
         }}
-        className="grid-cols-1 lg:grid-cols-12"
       >
         {/* Content */}
         <div
-          style={{ gridColumn: "1 / 7", display: "flex", flexDirection: "column", justifyContent: "center" }}
-          className="col-span-12 lg:col-span-6"
+          style={{
+            gridColumn: isMobile ? "1 / 2" : "1 / 7",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
         >
           <span
             className="gsap-fade-up"
             style={{
               fontFamily: "'Inter', sans-serif",
-              fontSize: "12px",
+              fontSize: isMobile ? 10 : 12,
               fontWeight: 600,
               letterSpacing: "0.2em",
               textTransform: "uppercase",
               color: "var(--gs-gold)",
               marginBottom: "24px",
               display: "block",
-              textShadow: "0 2px 20px rgba(0,0,0,0.9)",
+              textAlign: isMobile ? "center" : "left",
+              textShadow: "0 1px 12px rgba(0,0,0,0.95), 0 0 40px rgba(0,0,0,0.7)",
             }}
           >
             Arsitektur &amp; Konstruksi
@@ -57,13 +70,14 @@ export function HeroSection({ onCta }: HeroSectionProps) {
             className="gsap-headline"
             style={{
               fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(40px, 6vw, 80px)",
+              fontSize: isMobile ? "clamp(32px, 9vw, 44px)" : "clamp(40px, 6vw, 80px)",
               fontWeight: 600,
               color: "var(--gs-on-surface)",
               lineHeight: 1.1,
               letterSpacing: "-0.02em",
               marginBottom: "32px",
-              textShadow: "0 2px 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.6)",
+              textAlign: isMobile ? "center" : "left",
+              textShadow: "0 2px 30px rgba(0,0,0,0.95), 0 0 60px rgba(0,0,0,0.8)",
             }}
           >
             Dari Pondasi
@@ -75,19 +89,29 @@ export function HeroSection({ onCta }: HeroSectionProps) {
             className="gsap-fade-up"
             style={{
               fontFamily: "'Inter', sans-serif",
-              fontSize: "18px",
+              fontSize: isMobile ? 14 : 18,
               lineHeight: 1.6,
               color: "var(--gs-on-surface-variant)",
               marginBottom: "48px",
               maxWidth: "480px",
-              textShadow: "0 2px 20px rgba(0,0,0,0.9)",
+              alignSelf: isMobile ? "center" : undefined,
+              textAlign: isMobile ? "center" : "left",
+              textShadow: "0 1px 8px rgba(0,0,0,0.9)",
             }}
           >
             Mewujudkan visi arsitektural dengan presisi tanpa kompromi. Kami adalah mitra
             konstruksi premium untuk ruang yang abadi.
           </p>
 
-          <div className="gsap-fade-up" style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+          <div
+            className="gsap-fade-up"
+            style={{
+              display: "flex",
+              gap: "16px",
+              flexDirection: isMobile ? "column" : "row",
+              alignItems: isMobile ? "stretch" : undefined,
+            }}
+          >
             <button
               onClick={onCta}
               className="gs-pulse"
@@ -101,9 +125,11 @@ export function HeroSection({ onCta }: HeroSectionProps) {
                 background: "rgba(200,169,110,0.1)",
                 border: "1px solid rgba(200,169,110,0.5)",
                 backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
                 padding: "16px 36px",
                 cursor: "pointer",
                 transition: "all 0.3s ease",
+                width: isMobile ? "100%" : "auto",
               }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLElement;
@@ -134,6 +160,7 @@ export function HeroSection({ onCta }: HeroSectionProps) {
                 padding: "16px 36px",
                 cursor: "pointer",
                 transition: "all 0.3s ease",
+                width: isMobile ? "100%" : "auto",
               }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLElement;
@@ -151,10 +178,10 @@ export function HeroSection({ onCta }: HeroSectionProps) {
           </div>
         </div>
 
-        {/* Hero Glass Panel — canvas shows through */}
+        {/* Hero Glass Panel — hidden on mobile, canvas already provides visual */}
         <div
-          className="gsap-img-reveal col-span-12 lg:col-span-6"
-          style={{ gridColumn: "7 / 13" }}
+          className="gsap-img-reveal"
+          style={{ gridColumn: isMobile ? "1 / 2" : "7 / 13", display: isMobile ? "none" : "block" }}
           data-dir="right"
         >
           <div

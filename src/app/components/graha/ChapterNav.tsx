@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 interface ChapterNavProps {
   activeChapter: string;
 }
@@ -10,31 +12,42 @@ const CHAPTERS = [
 ];
 
 export function ChapterNav({ activeChapter }: ChapterNavProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check, { passive: true });
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
     <div
-      className="hidden lg:block"
       style={{
         position: "sticky",
-        top: "88px",
+        top: "72px",
         zIndex: 30,
-        padding: "0 80px",
+        padding: isMobile ? "0 5vw" : "0 80px",
         maxWidth: "1440px",
         margin: "0 auto 48px",
       }}
     >
       <div
+        className="chapter-nav-scroll"
         style={{
           display: "flex",
-          gap: "32px",
+          gap: isMobile ? "0" : "32px",
           borderBottom: "1px solid rgba(77,70,58,0.3)",
-          paddingBottom: "16px",
           background: "rgba(7,8,10,0.5)",
           backdropFilter: "blur(12px)",
-          padding: "12px 20px 16px",
+          WebkitBackdropFilter: "blur(12px)",
+          padding: "12px 20px 0",
+          overflowX: isMobile ? "auto" : "visible",
+          WebkitOverflowScrolling: "touch",
         }}
       >
         {CHAPTERS.map((ch) => (
@@ -43,7 +56,7 @@ export function ChapterNav({ activeChapter }: ChapterNavProps) {
             onClick={() => scrollTo(ch.id)}
             style={{
               fontFamily: "'Inter', sans-serif",
-              fontSize: "11px",
+              fontSize: isMobile ? 10 : 11,
               fontWeight: 600,
               letterSpacing: "0.15em",
               textTransform: "uppercase",
@@ -55,10 +68,12 @@ export function ChapterNav({ activeChapter }: ChapterNavProps) {
                 activeChapter === ch.id
                   ? "2px solid var(--gs-gold)"
                   : "2px solid transparent",
-              paddingBottom: "16px",
-              marginBottom: "-17px",
+              padding: isMobile ? "8px 12px 16px" : "0 0 16px",
+              marginBottom: "-1px",
               cursor: "pointer",
               transition: "color 0.3s, border-color 0.3s",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
             onMouseEnter={(e) =>
               ((e.currentTarget as HTMLElement).style.color = "var(--gs-gold)")

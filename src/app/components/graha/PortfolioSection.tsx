@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { AnimatedCard } from "../../../components/AnimatedCard";
 
@@ -55,6 +55,14 @@ const FILTERS = ["All", "Residential", "Commercial", "High-rise", "Interior"];
 export function PortfolioSection() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [hovered, setHovered] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check, { passive: true });
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const filtered =
     activeFilter === "All"
@@ -66,7 +74,7 @@ export function PortfolioSection() {
       id="portfolio"
       className="gs-section"
       style={{
-        padding: "120px clamp(24px, 6vw, 80px)",
+        padding: isMobile ? "60px 5vw" : "120px clamp(24px, 6vw, 80px)",
         maxWidth: "1440px",
         margin: "0 auto",
         borderTop: "1px solid rgba(77,70,58,0.12)",
@@ -77,10 +85,10 @@ export function PortfolioSection() {
       <div
         style={{
           display: "flex",
+          flexDirection: isMobile ? "column" : "row",
           justifyContent: "space-between",
-          alignItems: "flex-end",
+          alignItems: isMobile ? "flex-start" : "flex-end",
           marginBottom: "48px",
-          flexWrap: "wrap",
           gap: "24px",
         }}
       >
@@ -116,7 +124,17 @@ export function PortfolioSection() {
         </div>
 
         {/* Filters */}
-        <div className="gs-fade d2" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <div
+          className="gs-fade d2 filter-scroll"
+          style={{
+            display: "flex",
+            gap: "8px",
+            overflowX: isMobile ? "auto" : "visible",
+            flexWrap: isMobile ? "nowrap" : "wrap",
+            WebkitOverflowScrolling: "touch",
+            paddingBottom: isMobile ? "4px" : undefined,
+          }}
+        >
           {FILTERS.map((f) => (
             <button
               key={f}
@@ -159,7 +177,7 @@ export function PortfolioSection() {
         className="gsap-stagger-parent"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
           gap: "16px",
         }}
       >
@@ -265,7 +283,7 @@ export function PortfolioSection() {
         className="gs-fade d3"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
           gap: "32px",
           marginTop: "80px",
           paddingTop: "48px",

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { MessageSquare } from "lucide-react";
 
 interface ContactSectionProps {
@@ -5,14 +6,24 @@ interface ContactSectionProps {
 }
 
 export function ContactSection({ onOpen }: ContactSectionProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check, { passive: true });
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   return (
     <section
       id="contact"
       className="gs-section"
       style={{
-        padding: "120px clamp(24px, 6vw, 80px)",
+        padding: isMobile ? "80px 5vw" : "120px clamp(24px, 6vw, 80px)",
         background: "rgba(7,8,10,0.5)",
         backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
         borderTop: "1px solid rgba(77,70,58,0.2)",
         borderBottom: "1px solid rgba(77,70,58,0.2)",
         marginTop: "80px",
@@ -56,11 +67,12 @@ export function ContactSection({ onOpen }: ContactSectionProps) {
           className="gs-fade d1"
           style={{
             fontFamily: "'Playfair Display', serif",
-            fontSize: "clamp(28px, 4vw, 56px)",
+            fontSize: isMobile ? "clamp(28px, 8vw, 40px)" : "clamp(32px, 4vw, 56px)",
             fontWeight: 500,
             color: "var(--gs-on-surface)",
             marginBottom: "24px",
             lineHeight: 1.2,
+            textShadow: "0 2px 20px rgba(0,0,0,0.9)",
           }}
         >
           Wujudkan Ruang Anda
@@ -75,13 +87,25 @@ export function ContactSection({ onOpen }: ContactSectionProps) {
             color: "var(--gs-on-surface-variant)",
             marginBottom: "48px",
             maxWidth: "560px",
+            textShadow: "0 1px 8px rgba(0,0,0,0.9)",
           }}
         >
           Konsultasikan visi arsitektural Anda dengan tim ahli kami. Kami siap menerjemahkan
           ide menjadi struktur monumental.
         </p>
 
-        <div className="gs-fade d3" style={{ display: "flex", gap: "16px", flexWrap: "wrap", justifyContent: "center" }}>
+        <div
+          className="gs-fade d3"
+          style={{
+            display: "flex",
+            gap: "16px",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: "center",
+            justifyContent: "center",
+            width: isMobile ? "100%" : undefined,
+            maxWidth: isMobile ? 320 : undefined,
+          }}
+        >
           <button
             onClick={onOpen}
             className="gs-pulse"
@@ -98,8 +122,10 @@ export function ContactSection({ onOpen }: ContactSectionProps) {
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
+              justifyContent: "center",
               gap: "10px",
               transition: "opacity 0.3s, transform 0.2s",
+              width: isMobile ? "100%" : "auto",
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLElement;
@@ -132,7 +158,9 @@ export function ContactSection({ onOpen }: ContactSectionProps) {
               textDecoration: "none",
               display: "inline-flex",
               alignItems: "center",
+              justifyContent: "center",
               transition: "all 0.3s ease",
+              width: isMobile ? "100%" : "auto",
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLElement;

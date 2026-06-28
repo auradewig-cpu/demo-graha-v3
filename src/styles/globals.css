@@ -1,14 +1,21 @@
 /* ── v3 Base Reset ── */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { scroll-behavior: auto !important; }
+html {
+  scroll-behavior: auto !important;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
 
 body {
   background: #07080A;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
+  -webkit-overflow-scrolling: touch;
 }
+
+img { max-width: 100%; height: auto; }
 
 canvas { display: block; }
 
@@ -18,6 +25,20 @@ section { background: transparent !important; }
 /* GSAP animation helpers */
 .gsap-headline { will-change: clip-path, transform; }
 .gsap-img-reveal { will-change: transform, opacity; overflow: hidden; }
+.gsap-fade-up { will-change: transform, opacity; }
+
+/* Mobile: kurangi GSAP distance */
+@media (max-width: 767px) {
+  [data-reveal="fade-up"] { transform: translateY(30px); }
+  [data-reveal="slide-left"] { transform: translateX(-40px); }
+  [data-reveal="slide-right"] { transform: translateX(40px); }
+}
+
+/* Filter & chapter nav scrollbar hide */
+.filter-scroll::-webkit-scrollbar { display: none; }
+.filter-scroll { scrollbar-width: none; }
+.chapter-nav-scroll::-webkit-scrollbar { display: none; }
+.chapter-nav-scroll { scrollbar-width: none; }
 
 /* ── Graha Studio Design Tokens ── */
 :root {
